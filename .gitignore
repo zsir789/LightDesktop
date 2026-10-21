@@ -1,0 +1,27 @@
+# Gradle / Android build outputs
+*.iml
+.gradle/
+.kotlin/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.aab
+*.hprof
+
+# Local machine configuration
+local.properties
+.idea/
+.DS_Store
+
+# Signing secrets (never commit)
+keystore.properties
+keystore/*.jks
+keystore/*.keystore
+
+# Latest release copies (identical artifacts are archived under versions/)
+release/
+
+# Temporary files
+*.tmp
+*.log
