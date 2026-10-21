@@ -2,6 +2,8 @@
 
 > 一款模块化、纯本地的移动端桌面小工具（Android · Kotlin · Jetpack Compose）。
 > 首页 · 备忘（备忘录 + 待办）· 课表 · 天气 · 设置与统计，全部数据保存在本机。
+>
+> 仓库：<https://github.com/zsir789/LightDesktop> · 历史版本与签名 APK：`versions/`
 
 ---
 

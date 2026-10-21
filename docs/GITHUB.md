@@ -15,8 +15,8 @@
 ## 克隆
 
 ```bash
-git clone <仓库地址>
-cd dsh_desktop_master
+git clone git@github.com:zsir789/LightDesktop.git
+cd LightDesktop
 ```
 
 构建见 `README.md` 的「构建与测试」。需要 JDK 17+、Android SDK（compileSdk 35），并自备签名密钥
