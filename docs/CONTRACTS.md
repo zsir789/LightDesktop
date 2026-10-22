@@ -1,4 +1,4 @@
-# 开发契约（v1.2.0 基线）
+# 开发契约（v1.2.1 基线）
 
 本文件记录工程约定与核心接口清单。**修改接口签名需同步更新本文件与调用方**。
 
@@ -201,7 +201,7 @@ WeatherRoute(cacheRepository: WeatherRepository, settingsRepository, statsTracke
 StatsRoute(settingsRepository, statsRepository, appVersion: String, modifier)
 ```
 
-### 3.7 课表缩放（`com.lightdesk.feature.timetable.TimetableZoom`，v1.2.0）
+### 3.7 课表缩放（`com.lightdesk.feature.timetable.TimetableZoom`，v1.2.0 起；v1.2.1 增加横向缩放）
 
 ```kotlin
 object TimetableZoom {
@@ -209,6 +209,12 @@ object TimetableZoom {
     const val STEP = 1.25f
     const val BASE_HOUR_HEIGHT_DP = 64f; const val MIN_HOUR_HEIGHT_DP = 24f
     const val COMPACT_SCALE_THRESHOLD = 0.85f
+    // v1.2.1 新增：横向尺寸与字号也跟随同一缩放比例
+    const val BASE_DAY_COLUMN_WIDTH_DP = 96f
+    const val BASE_TIME_AXIS_WIDTH_DP = 48f
+    const val MIN_TIME_AXIS_WIDTH_DP = 36f
+    const val MIN_TEXT_SCALE = 0.82f
+    const val MAX_TEXT_SCALE = 1.5f
     fun clamp(scale: Float): Float
     fun zoomBy(current: Float, factor: Float): Float
     fun zoomIn(current: Float): Float; fun zoomOut(current: Float): Float
@@ -219,8 +225,15 @@ object TimetableZoom {
     fun scaleLabel(scale: Float): String          // "全览" / "标准" / "150%"
     fun hourHeightDp(scale: Float, base: Float = BASE_HOUR_HEIGHT_DP): Float
     fun gridHeightDp(totalMinutes: Int, scale: Float, base: Float = BASE_HOUR_HEIGHT_DP): Float
+    fun dayColumnWidthDp(scale: Float, base: Float = BASE_DAY_COLUMN_WIDTH_DP): Float
+    fun timeAxisWidthDp(scale: Float, base: Float = BASE_TIME_AXIS_WIDTH_DP, min: Float = MIN_TIME_AXIS_WIDTH_DP): Float
+    fun textScale(scale: Float): Float            // 0.82f..1.5f
 }
 ```
+
+> 约定：缩放只改变尺寸与字号，不改变课程在时间轴上的位置（`startMinutes`/`endMinutes` 不变）；
+> 横向与纵向必须使用同一个 `scale`，避免只在单一方向缩放。`TimetableScreen` 通过私有
+> `TextStyle.scaled(factor)` 复刻字号/行高，其余字体属性仍由主题控制。
 
 ## 4. 设计系统（`com.lightdesk.core.designsystem`）
 
@@ -238,6 +251,13 @@ object LightDeskPalettes { fun of(palette: ThemePalette, dark: Boolean): LightDe
 fun ThemePalette.label(): String                 // 海盐蓝 / 薄荷绿 / 蜜桃橙 / 薰衣草 / 暖沙金 / 樱花粉
 val ThemePaletteOptions: List<ThemePalette>
 val LocalLightDeskPalette: ProvidableCompositionLocal<LightDeskPalette>   // 取 accentSoft 等扩展色
+val LocalLightDeskDarkTheme: ProvidableCompositionLocal<Boolean>          // v1.2.1：需要按深浅色取色的纯函数用
+
+// HeatmapColors.kt（v1.2.1，热力图 5 档顺序色阶；纯函数，便于单测）
+object HeatmapColors {
+    const val LEVEL_COUNT = 5
+    fun levelColor(level: Int, palette: LightDeskPalette, dark: Boolean): Color
+}
 
 // CourseColors.kt（课程/事项 pastel 色块，12 色）
 object CourseColors {

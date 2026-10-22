@@ -53,8 +53,8 @@ class StatsPresentationTest {
     fun `heatLevel never exceeds level count`() {
         val maxLevel = HeatmapConfig.LEVEL_COUNT - 1
         assertEquals(maxLevel, HeatmapConfig.heatLevel(Int.MAX_VALUE))
-        assertEquals(HeatmapConfig.LEVEL_COUNT, HeatmapConfig.levelAlphas.size)
-        assertEquals(maxLevel, HeatmapConfig.levelAlphas.lastIndex)
+        assertEquals(HeatmapConfig.LEVEL_COUNT, HeatmapConfig.levelLegendLabels.size)
+        assertEquals(maxLevel, HeatmapConfig.levelLegendLabels.lastIndex)
     }
 
     // ------------------------------------------------------------------

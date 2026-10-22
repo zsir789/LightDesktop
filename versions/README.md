@@ -18,6 +18,7 @@
 | v1.0.0 | 2026-10-19 | 首个版本：备忘录、课表、天气、交互统计、悬浮球、待办倒计时 |
 | v1.1.0 | 2026-10-19 | 首页聚合、备忘与待办合并、设置与统计合页、课表月视图、移除悬浮球 |
 | v1.2.0 | 2026-10-21 | 6 套浅色主题与换色设置、课程与卡片彩色色块、课表缩放与全览、交互动效打磨 |
+| v1.2.1 | 2026-10-22 | 课表横向缩放修复（横纵同步缩放）、热力图 5 档色阶与图例优化 |
 
 `versions/SHA256SUMS.txt` 汇总记录所有版本的校验和，可对照校验下载的安装包。
 
@@ -26,8 +27,8 @@
 在项目根目录执行（本机没有 `pwsh`，必须用 `powershell`）：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-release.ps1 -Version 1.2.0
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-release.ps1 -Version 1.2.1
 ```
 
-脚本依次执行：全量 JVM 单测 → 签名 Release APK → 打包源码 → 复制产物与更新报告到 `versions/v1.2.0/`
-→ 生成校验和。更新报告需提前放在 `docs/releases/v1.2.0/UPDATE-REPORT.md`，否则归档目录中不会有报告文件。
+脚本依次执行：全量 JVM 单测 → 签名 Release APK → 打包源码 → 复制产物与更新报告到 `versions/v1.2.1/`
+→ 生成校验和。更新报告需提前放在 `docs/releases/v1.2.1/UPDATE-REPORT.md`，否则归档目录中不会有报告文件。

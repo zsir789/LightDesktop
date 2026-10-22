@@ -70,7 +70,10 @@ import com.lightdesk.core.designsystem.component.SettingSwitchRow
 import com.lightdesk.core.designsystem.component.SettingValueRow
 import com.lightdesk.core.designsystem.component.TagPill
 import com.lightdesk.core.designsystem.component.TextAction
+import com.lightdesk.core.designsystem.theme.HeatmapColors
 import com.lightdesk.core.designsystem.theme.LightDeskPalettes
+import com.lightdesk.core.designsystem.theme.LocalLightDeskDarkTheme
+import com.lightdesk.core.designsystem.theme.LocalLightDeskPalette
 import com.lightdesk.core.designsystem.theme.LocalStatusColors
 import com.lightdesk.core.model.AppSettings
 import com.lightdesk.core.model.FeatureKey
@@ -803,6 +806,12 @@ private fun HeatmapCard(stats: UsageStats, today: LocalDate) {
         }
         Spacer(modifier = Modifier.height(10.dp))
         HeatmapLegend()
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "颜色越深，当天活动越多",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Spacer(modifier = Modifier.height(14.dp))
         SectionDivider()
         Spacer(modifier = Modifier.height(10.dp))
@@ -853,45 +862,64 @@ private fun WeekdayHeaderRow() {
 
 @Composable
 private fun HeatCell(day: StatsPresentation.HeatDay, modifier: Modifier = Modifier) {
-    val color: Color = when {
-        day.isFuture -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-        day.level <= 0 -> MaterialTheme.colorScheme.surfaceVariant
-        else -> MaterialTheme.colorScheme.primary.copy(
-            alpha = HeatmapConfig.levelAlphas[day.level.coerceIn(0, HeatmapConfig.LEVEL_COUNT - 1)],
-        )
+    val palette = LocalLightDeskPalette.current
+    val dark = LocalLightDeskDarkTheme.current
+    val shape = RoundedCornerShape(HEAT_CELL_CORNER)
+    val level = if (day.isFuture) 0 else day.level.coerceIn(0, HeatmapConfig.LEVEL_COUNT - 1)
+    val color = if (day.isFuture) {
+        palette.surfaceVariant.copy(alpha = 0.45f)
+    } else {
+        HeatmapColors.levelColor(level, palette, dark)
     }
     Box(
         modifier = modifier
             .padding(2.dp)
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(HEAT_CELL_CORNER))
-            .background(color),
+            .clip(shape)
+            .background(color)
+            .border(
+                width = 0.6.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f),
+                shape = shape,
+            ),
     )
 }
 
 @Composable
 private fun HeatmapLegend() {
+    val palette = LocalLightDeskPalette.current
+    val dark = LocalLightDeskDarkTheme.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
             text = "少",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        for (level in 0 until HeatmapConfig.LEVEL_COUNT) {
-            val color = if (level == 0) {
-                MaterialTheme.colorScheme.surfaceVariant
-            } else {
-                MaterialTheme.colorScheme.primary.copy(alpha = HeatmapConfig.levelAlphas[level])
+        HeatmapConfig.levelLegendLabels.forEachIndexed { level, label ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                val shape = RoundedCornerShape(4.dp)
+                Box(
+                    modifier = Modifier
+                        .size(16.dp)
+                        .clip(shape)
+                        .background(HeatmapColors.levelColor(level, palette, dark))
+                        .border(
+                            width = 0.6.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f),
+                            shape = shape,
+                        ),
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
             }
-            Box(
-                modifier = Modifier
-                    .size(14.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(color),
-            )
         }
         Text(
             text = "多",

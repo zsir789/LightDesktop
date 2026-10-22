@@ -6,7 +6,8 @@ import kotlin.math.roundToInt
 /**
  * 周视图缩放的纯逻辑。
  *
- * 缩放只影响“时间轴高度 / 课程块高度”，横向 7 列宽度不变，因此缩放后依然可以双向滚动；
+ * v1.2.1 起缩放是“双向”的：时间轴高度、7 列宽度、图表文字字号一起按比例变化，
+ * 不再是“只把行拉高、列宽不变”，放大后可以横向看到更完整的课程名与地点。
  * 全部为纯函数，便于 JVM 单测（见 `TimetableZoomTest`）。
  *
  * 取值范围 0.6x–2.0x：
@@ -33,6 +34,19 @@ object TimetableZoom {
 
     /** 每小时高度的下限，避免缩到不可读。 */
     const val MIN_HOUR_HEIGHT_DP = 24f
+
+    /** 标准缩放下单个星期几的列宽（dp）。 */
+    const val BASE_DAY_COLUMN_WIDTH_DP = 96f
+
+    /** 标准缩放下左侧时间轴的宽度（dp）。 */
+    const val BASE_TIME_AXIS_WIDTH_DP = 48f
+
+    /** 时间轴宽度下限：再窄就放不下「08:00」这类时间文案。 */
+    const val MIN_TIME_AXIS_WIDTH_DP = 36f
+
+    /** 文字缩放下限 / 上限：与列宽同步缩放，但保证最小可读、最大不夸张。 */
+    const val MIN_TEXT_SCALE = 0.82f
+    const val MAX_TEXT_SCALE = 1.5f
 
     /** 小于该比例时课程块进入紧凑模式（单行标题、隐藏地点）。 */
     const val COMPACT_SCALE_THRESHOLD = 0.85f
@@ -81,6 +95,23 @@ object TimetableZoom {
     /** 某一缩放下的每小时高度（dp），不会低于 [MIN_HOUR_HEIGHT_DP]。 */
     fun hourHeightDp(scale: Float, base: Float = BASE_HOUR_HEIGHT_DP): Float =
         (base * clamp(scale)).coerceAtLeast(MIN_HOUR_HEIGHT_DP)
+
+    /**
+     * 某一缩放下的星期列宽（dp）：横向同样跟随缩放，放大后课程块更宽、文字有更多空间。
+     */
+    fun dayColumnWidthDp(scale: Float, base: Float = BASE_DAY_COLUMN_WIDTH_DP): Float =
+        base * clamp(scale)
+
+    /** 某一缩放下的时间轴宽度（dp），不会低于 [MIN_TIME_AXIS_WIDTH_DP]。 */
+    fun timeAxisWidthDp(scale: Float, base: Float = BASE_TIME_AXIS_WIDTH_DP): Float =
+        (base * clamp(scale)).coerceAtLeast(MIN_TIME_AXIS_WIDTH_DP)
+
+    /**
+     * 文字缩放下限：与列宽同步缩放，但夹紧在 [MIN_TEXT_SCALE]..[MAX_TEXT_SCALE]，
+     * 既保证全览时仍可读，也避免放大后文字过大撑破课程块。
+     */
+    fun textScale(scale: Float): Float =
+        clamp(scale).coerceIn(MIN_TEXT_SCALE, MAX_TEXT_SCALE)
 
     /** 给定网格总分钟数（如 8:00–20:00 = 720）对应的整列高度（dp）。 */
     fun gridHeightDp(

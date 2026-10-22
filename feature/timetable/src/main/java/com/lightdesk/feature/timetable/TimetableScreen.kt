@@ -60,6 +60,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -85,8 +86,6 @@ import java.time.LocalDate
 import java.time.YearMonth
 import kotlinx.coroutines.launch
 
-private val DayColumnWidth = 96.dp
-private val TimeAxisWidth = 48.dp
 private val MonthCellHeight = 84.dp
 private val MinCourseCardHeight = 44.dp
 private val CompactCourseCardHeight = 34.dp
@@ -589,6 +588,10 @@ private fun WeeklyGrid(
     val gridStart = remember(allCourses) { computeGridStart(allCourses) }
     val gridEnd = remember(allCourses, gridStart) { computeGridEnd(allCourses, gridStart) }
     val hourHeightDp = TimetableZoom.hourHeightDp(scale)
+    // v1.2.1：横向（列宽 / 时间轴）与文字字号跟随缩放，避免“只有竖直方向缩放”。
+    val dayColumnWidthDp = TimetableZoom.dayColumnWidthDp(scale)
+    val timeAxisWidthDp = TimetableZoom.timeAxisWidthDp(scale)
+    val textScale = TimetableZoom.textScale(scale)
     val compact = TimetableZoom.isCompact(scale)
 
     Column(modifier.fillMaxWidth()) {
@@ -597,9 +600,15 @@ private fun WeeklyGrid(
                 .fillMaxWidth()
                 .horizontalScroll(horizontalScroll),
         ) {
-            Spacer(Modifier.width(TimeAxisWidth))
+            Spacer(Modifier.width(timeAxisWidthDp.dp))
             dates.forEachIndexed { index, date ->
-                DayHeader(weekday = index + 1, date = date, isToday = date == today)
+                DayHeader(
+                    weekday = index + 1,
+                    date = date,
+                    isToday = date == today,
+                    widthDp = dayColumnWidthDp,
+                    textScale = textScale,
+                )
             }
         }
         Box(
@@ -613,13 +622,21 @@ private fun WeeklyGrid(
                     .horizontalScroll(horizontalScroll)
                     .pinchToZoom(onPinchZoom),
             ) {
-                TimeAxis(gridStart = gridStart, gridEnd = gridEnd, hourHeightDp = hourHeightDp)
+                TimeAxis(
+                    gridStart = gridStart,
+                    gridEnd = gridEnd,
+                    hourHeightDp = hourHeightDp,
+                    widthDp = timeAxisWidthDp,
+                    textScale = textScale,
+                )
                 dates.forEachIndexed { index, date ->
                     DayColumn(
                         courses = coursesByWeekday[index + 1].orEmpty(),
                         gridStart = gridStart,
                         gridEnd = gridEnd,
                         hourHeightDp = hourHeightDp,
+                        widthDp = dayColumnWidthDp,
+                        textScale = textScale,
                         compact = compact,
                         isToday = date == today,
                         onCourseClick = onCourseClick,
@@ -653,7 +670,13 @@ private fun Modifier.pinchToZoom(onZoom: (Float) -> Unit): Modifier = pointerInp
 }
 
 @Composable
-private fun DayHeader(weekday: Int, date: LocalDate, isToday: Boolean) {
+private fun DayHeader(
+    weekday: Int,
+    date: LocalDate,
+    isToday: Boolean,
+    widthDp: Float,
+    textScale: Float,
+) {
     val labelColor = if (isToday) {
         MaterialTheme.colorScheme.primary
     } else {
@@ -661,19 +684,19 @@ private fun DayHeader(weekday: Int, date: LocalDate, isToday: Boolean) {
     }
     Column(
         modifier = Modifier
-            .width(DayColumnWidth)
+            .width(widthDp.dp)
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             text = TimeFormat.weekdayLabel(weekday),
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelLarge.scaled(textScale),
             color = labelColor,
             maxLines = 1,
         )
         Text(
             text = "${date.monthValue}/${date.dayOfMonth}",
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelSmall.scaled(textScale),
             color = if (isToday) {
                 MaterialTheme.colorScheme.primary
             } else {
@@ -685,19 +708,25 @@ private fun DayHeader(weekday: Int, date: LocalDate, isToday: Boolean) {
 }
 
 @Composable
-private fun TimeAxis(gridStart: Int, gridEnd: Int, hourHeightDp: Float) {
+private fun TimeAxis(
+    gridStart: Int,
+    gridEnd: Int,
+    hourHeightDp: Float,
+    widthDp: Float,
+    textScale: Float,
+) {
     val totalMinutes = gridEnd - gridStart
     val minuteHeightDp = hourHeightDp / MinutesPerHour
     Box(
         modifier = Modifier
-            .width(TimeAxisWidth)
+            .width(widthDp.dp)
             .height((totalMinutes * minuteHeightDp).dp),
     ) {
         var minute = gridStart
         while (minute <= gridEnd) {
             Text(
                 text = TimeFormat.minutesToClock(minute),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.scaled(textScale),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.End,
                 maxLines = 1,
@@ -718,6 +747,8 @@ private fun DayColumn(
     gridStart: Int,
     gridEnd: Int,
     hourHeightDp: Float,
+    widthDp: Float,
+    textScale: Float,
     compact: Boolean,
     isToday: Boolean,
     onCourseClick: (Course) -> Unit,
@@ -727,10 +758,12 @@ private fun DayColumn(
     val lineColor = MaterialTheme.colorScheme.outlineVariant.copy(
         alpha = if (isToday) 0.7f else GridBgAlpha,
     )
-    val minCardHeightDp = (if (compact) CompactCourseCardHeight else MinCourseCardHeight).value
+    val minCardHeightDp = (
+        (if (compact) CompactCourseCardHeight else MinCourseCardHeight).value * textScale
+        ).coerceAtLeast(24f)
     Box(
         modifier = Modifier
-            .width(DayColumnWidth)
+            .width(widthDp.dp)
             .height((totalMinutes * minuteHeightDp).dp),
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -755,6 +788,7 @@ private fun DayColumn(
             CourseCard(
                 course = course,
                 compact = compact,
+                textScale = textScale,
                 onClick = { onCourseClick(course) },
                 modifier = Modifier
                     .padding(horizontal = 2.dp)
@@ -773,6 +807,7 @@ private fun DayColumn(
 private fun CourseCard(
     course: Course,
     compact: Boolean,
+    textScale: Float,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -797,11 +832,14 @@ private fun CourseCard(
                 modifier = Modifier
                     .fillMaxSize()
                     .clickable(onClick = onClick)
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                    .padding(
+                        horizontal = (6f * textScale).dp,
+                        vertical = (4f * textScale).dp,
+                    ),
             ) {
                 Text(
                     text = course.title,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelMedium.scaled(textScale),
                     color = contentColor,
                     maxLines = if (compact) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
@@ -809,7 +847,7 @@ private fun CourseCard(
                 if (!compact && course.location.isNotBlank()) {
                     Text(
                         text = course.location,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelSmall.scaled(textScale),
                         color = contentColor.copy(alpha = 0.78f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -1194,3 +1232,12 @@ private fun dateRangeText(weekStart: LocalDate): String {
     val weekEnd = weekStart.plusDays(6)
     return "${weekStart.monthValue}月${weekStart.dayOfMonth}日 - ${weekEnd.monthValue}月${weekEnd.dayOfMonth}日"
 }
+
+/**
+ * 按缩放比例同步放大/缩小字号与行高，让“横向缩放”时文字与格子一起变化。
+ * 只复制 fontSize / lineHeight，其余字体属性（字重、字族）仍由主题统一控制。
+ */
+private fun TextStyle.scaled(factor: Float): TextStyle = copy(
+    fontSize = fontSize * factor,
+    lineHeight = lineHeight * factor,
+)

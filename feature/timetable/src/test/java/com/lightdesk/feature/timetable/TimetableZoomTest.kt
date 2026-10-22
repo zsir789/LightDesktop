@@ -108,4 +108,36 @@ class TimetableZoomTest {
         // 全览 0.6x
         assertEquals(460.8f, TimetableZoom.gridHeightDp(720, TimetableZoom.MIN_SCALE), 0.001f)
     }
+
+    @Test
+    fun `day column width scales horizontally`() {
+        assertEquals(TimetableZoom.BASE_DAY_COLUMN_WIDTH_DP, TimetableZoom.dayColumnWidthDp(1.0f), 0.001f)
+        assertEquals(192f, TimetableZoom.dayColumnWidthDp(2.0f), 0.001f)
+        assertEquals(57.6f, TimetableZoom.dayColumnWidthDp(TimetableZoom.MIN_SCALE), 0.001f)
+    }
+
+    @Test
+    fun `time axis width scales but keeps a minimum`() {
+        assertEquals(TimetableZoom.BASE_TIME_AXIS_WIDTH_DP, TimetableZoom.timeAxisWidthDp(1.0f), 0.001f)
+        assertEquals(96f, TimetableZoom.timeAxisWidthDp(2.0f), 0.001f)
+        // 0.6x 时 48dp * 0.6 = 28.8dp，低于下限，应夹紧到最小值
+        assertEquals(TimetableZoom.MIN_TIME_AXIS_WIDTH_DP, TimetableZoom.timeAxisWidthDp(TimetableZoom.MIN_SCALE), 0.001f)
+    }
+
+    @Test
+    fun `text scale follows zoom but is clamped`() {
+        assertEquals(1.0f, TimetableZoom.textScale(1.0f), 0.001f)
+        assertEquals(TimetableZoom.MIN_TEXT_SCALE, TimetableZoom.textScale(TimetableZoom.MIN_SCALE), 0.001f)
+        assertEquals(TimetableZoom.MAX_TEXT_SCALE, TimetableZoom.textScale(TimetableZoom.MAX_SCALE), 0.001f)
+    }
+
+    @Test
+    fun `horizontal zoom is monotonic with scale`() {
+        var previousWidth = 0f
+        listOf(0.6f, 0.8f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { scale ->
+            val width = TimetableZoom.dayColumnWidthDp(scale)
+            assertTrue("列宽应随缩放增大：scale=$scale width=$width", width > previousWidth)
+            previousWidth = width
+        }
+    }
 }

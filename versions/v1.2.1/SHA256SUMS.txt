@@ -1,0 +1,2 @@
+49ac4d1a42d39f3ecec5c0e8af3f6eacbbe3ed8b5576ded099379256875074d3  LightDesk-v1.2.1.apk
+cbdc8afb0b2fff9ff778f803d65d6436c1101076d8365e4e873842dfd92b7554  LightDesk-source-v1.2.1.zip

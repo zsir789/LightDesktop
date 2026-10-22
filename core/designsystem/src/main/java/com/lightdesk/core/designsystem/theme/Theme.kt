@@ -32,6 +32,9 @@ val LocalStatusColors = staticCompositionLocalOf {
 /** 当前生效的完整配色（含背景微色调、色块底色 [LightDeskPalette.accentSoft]）。 */
 val LocalLightDeskPalette = staticCompositionLocalOf { LightDeskPalettes.lightOf(ThemePalette.OCEAN) }
 
+/** 当前是否处于深色模式。供需要“按明暗取色”的组件（如热力图色阶）读取。 */
+val LocalLightDeskDarkTheme = staticCompositionLocalOf { false }
+
 /** 由配色注册表生成 Material3 浅色方案，新增配色无需改这里。 */
 private fun lightSchemeOf(palette: LightDeskPalette) = lightColorScheme(
     primary = palette.primary,
@@ -119,6 +122,7 @@ fun LightDeskTheme(
     CompositionLocalProvider(
         LocalStatusColors provides statusColors,
         LocalLightDeskPalette provides resolved,
+        LocalLightDeskDarkTheme provides darkTheme,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

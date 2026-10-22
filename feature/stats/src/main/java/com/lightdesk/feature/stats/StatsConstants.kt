@@ -101,8 +101,12 @@ object HeatmapConfig {
     /** 各等级（1..4）的活动量下界，0 级为 total <= 0。 */
     val levelMinTotals: List<Int> = listOf(1, 3, 6, 10)
 
-    /** 各等级格子相对主题色的透明度；0 级使用 surfaceVariant。 */
-    val levelAlphas: List<Float> = listOf(0f, 0.20f, 0.40f, 0.65f, 0.95f)
+    /**
+     * 图例上每一档的活动量区间文案，与 [levelMinTotals] 一一对应。
+     *
+     * 图例同时展示“色块 + 区间”，用户不必只靠颜色深浅猜测层级。
+     */
+    val levelLegendLabels: List<String> = listOf("0", "1-2", "3-5", "6-9", "10+")
 
     /** 活动总量 → 热力等级（0..4）；负数/异常值按 0 处理。 */
     fun heatLevel(total: Int): Int {

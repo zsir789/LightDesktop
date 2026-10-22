@@ -1,4 +1,4 @@
-# 轻桌面 v1.2.0 · 架构说明
+# 轻桌面 v1.2.1 · 架构说明
 
 > Android / Kotlin / Jetpack Compose 的桌面小工具集，功能模块化拆分，数据全部本地持久化。
 
@@ -72,7 +72,7 @@ filesDir/lightdesk/*.json
    与 UI 解耦；学期起始周由全表最早 `DTSTART` 推导（兼容 WakeUp 导出）。
 6. **移除悬浮球**：去掉前台服务与悬浮窗权限后，应用只保留网络权限，安装包更小、审核更友好。
 7. **UI 与逻辑分离**：每个 feature 都把纯逻辑抽到无 Android 依赖的 `XxxPresentation` / `XxxLogic`，
-   用 JVM 单测覆盖（当前共 216 个用例）。
+   用 JVM 单测覆盖（当前共 223 个用例）。
 8. **不硬编码**：城市、阈值、主题等配置来自 `AppSettings`；颜色/圆角/排版来自设计系统；
    网络地址集中在数据源，解析规则独立成类，均可单点替换。
 9. **配色是一等配置（v1.2.0）**：`ThemePalette` 枚举存在 `core:model`，由 `core:designsystem` 的
@@ -83,6 +83,12 @@ filesDir/lightdesk/*.json
    事项用 `id.hashCode()` 作为种子，保证「同一对象颜色稳定、彼此尽量不同」，可单测且与 UI 解耦。
 11. **缩放是独立状态机**：课表缩放抽为 `TimetableZoom` 纯函数（档位、步进、边界、行高换算），
    UI 只负责手势与动画，便于后续做持久化或更多视图。
+12. **缩放是二维的（v1.2.1）**：同一 `scale` 同时驱动行高、日列宽、时间轴宽度与字号
+   （`hourHeightDp` / `dayColumnWidthDp` / `timeAxisWidthDp` / `textScale`），避免只缩放单方向；
+   时间轴宽度保留 36dp 下限，字号夹紧在 0.82x–1.5x，保证最小档仍可读。
+13. **热力图色阶是纯函数（v1.2.1）**：`HeatmapColors.levelColor(level, palette, dark)` 用「表面色 → 主色」
+   顺序插值生成 5 档，不依赖透明度叠加；深浅色分别给定混合比例，因此换配色后仍保持单调递增的明度差，
+   且可在 JVM 单测中直接验证。
 
 ## 5. 扩展点（预留迭代接口）
 
