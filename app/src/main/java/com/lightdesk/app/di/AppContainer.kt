@@ -20,10 +20,12 @@ import com.lightdesk.core.data.repository.StatsRepository
 import com.lightdesk.core.data.repository.WeatherRepository
 import com.lightdesk.core.data.store.CourseTableStore
 import com.lightdesk.core.data.store.JsonFileStore
+import com.lightdesk.core.data.store.JsonSchemaMigrator
 import com.lightdesk.core.data.store.LegacyMemoStore
 import com.lightdesk.core.data.store.LegacyTodoStore
 import com.lightdesk.core.data.store.NoteStore
 import com.lightdesk.core.data.store.SettingsStore
+import com.lightdesk.core.data.store.StoreSchemaMigrator
 import com.lightdesk.core.data.store.UsageStatsStore
 import com.lightdesk.core.data.store.WeatherCacheStore
 import kotlinx.coroutines.CoroutineScope
@@ -55,15 +57,24 @@ class AppContainer(context: Context) {
         fileName: String,
         serializer: KSerializer<T>,
         defaultValue: () -> T,
+        migrator: JsonSchemaMigrator? = StoreSchemaMigrator,
     ): JsonFileStore<T> = JsonFileStore(
         file = File(baseDir, fileName),
         serializer = serializer,
         defaultValue = defaultValue,
         ioDispatcher = dispatchers.io,
+        migrator = migrator,
     )
 
+    /** v1.0.0 旧文件只读，不做 schema 迁移（其结构由 LegacyNotesMigration 独立转换）。 */
+    private fun <T> legacyStore(
+        fileName: String,
+        serializer: KSerializer<T>,
+        defaultValue: () -> T,
+    ): JsonFileStore<T> = store(fileName, serializer, defaultValue, migrator = null)
+
     val settingsRepository: SettingsRepository = JsonSettingsRepository(
-        store("settings.json", SettingsStore.serializer()) { SettingsStore() },
+        store("settings.json", SettingsStore.serializer(), defaultValue = { SettingsStore() }),
     )
 
     /**
@@ -71,27 +82,28 @@ class AppContainer(context: Context) {
      * 旧文件只读不删，迁移失败自动降级为空数据，不影响启动。
      */
     val notesRepository: NotesRepository = JsonNotesRepository(
-        store = store("notes.json", NoteStore.serializer()) { NoteStore() },
+        store = store("notes.json", NoteStore.serializer(), defaultValue = { NoteStore() }),
         legacyMigration = LegacyNotesMigration(
-            memoStore = store("memos.json", LegacyMemoStore.serializer()) { LegacyMemoStore() },
-            todoStore = store("todos.json", LegacyTodoStore.serializer()) { LegacyTodoStore() },
+            memoStore = legacyStore("memos.json", LegacyMemoStore.serializer()) { LegacyMemoStore() },
+            todoStore = legacyStore("todos.json", LegacyTodoStore.serializer()) { LegacyTodoStore() },
         ),
     )
 
     val courseRepository: CourseRepository = JsonCourseRepository(
-        store("courses.json", CourseTableStore.serializer()) { CourseTableStore() },
+        store("courses.json", CourseTableStore.serializer(), defaultValue = { CourseTableStore() }),
     )
 
     val statsRepository: StatsRepository = JsonStatsRepository(
-        store("usage_stats.json", UsageStatsStore.serializer()) { UsageStatsStore() },
+        store("usage_stats.json", UsageStatsStore.serializer(), defaultValue = { UsageStatsStore() }),
     )
 
     val weatherRepository: WeatherRepository = JsonWeatherRepository(
-        store("weather_cache.json", WeatherCacheStore.serializer()) { WeatherCacheStore() },
+        store("weather_cache.json", WeatherCacheStore.serializer(), defaultValue = { WeatherCacheStore() }),
     )
 
     val statsTracker: StatsTracker = StatsTracker(
         repository = statsRepository,
+        settingsRepository = settingsRepository,
         scope = appScope,
         timeProvider = timeProvider,
     )

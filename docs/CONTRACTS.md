@@ -111,6 +111,7 @@ data class UsageStats(visits, daily: Map<String, DailyActivity>, notesCreated, n
 data class AppSettings(weatherCity = "北京", weatherLatitude, weatherLongitude, countdownWarningMinutes = 1440,
                        weekStartMonday = true, themeMode = ThemeMode.SYSTEM, usageStatsEnabled = true,
                        themePalette: ThemePalette = ThemePalette.OCEAN)   // v1.2.0 新增，缺字段取默认
+// v1.2.2：countdownWarningMinutes 已接入首页待办提醒窗口；usageStatsEnabled 已控制 StatsTracker 是否写入
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 enum class ThemePalette { OCEAN, MINT, PEACH, LAVENDER, SAND, ROSE }   // v1.2.0 新增
 ```
@@ -164,7 +165,7 @@ interface WeatherRepository {
     suspend fun clear(): AppResult<Unit>
 }
 
-class StatsTracker(repository, scope, timeProvider) {
+class StatsTracker(repository, settingsRepository, scope, timeProvider) {
     fun trackVisit(feature: FeatureKey)
     fun trackNoteCreated()
     fun trackNoteCompleted()
@@ -172,8 +173,23 @@ class StatsTracker(repository, scope, timeProvider) {
 }
 ```
 
-存储：`JsonFileStore<T>(file, serializer, defaultValue, logger, ioDispatcher)` + `StoreModels.kt`
+> v1.2.2 起 `record()` 写入前先读 `settingsRepository.current().usageStatsEnabled`，
+> 关闭「使用统计」后所有埋点静默跳过（不删除历史数据）。
+
+存储：`JsonFileStore<T>(file, serializer, defaultValue, logger, ioDispatcher, migrator: JsonSchemaMigrator? = null)` + `StoreModels.kt`
 （`NoteStore`/`CourseTableStore`/`UsageStatsStore`/`SettingsStore`/`WeatherCacheStore`，`schemaVersion = 2`）。
+
+```kotlin
+interface JsonSchemaMigrator {
+    val currentVersion: Int
+    fun migrate(raw: String, from: Int): String
+}
+object StoreSchemaMigrator : JsonSchemaMigrator   // currentVersion = SCHEMA_VERSION；目前仅 v1→v2 透传
+```
+
+> 读取规则（v1.2.2）：解析文件根部 `schemaVersion`，低版本先过 `migrate` 再解码；
+> 高版本按当前结构尽力读取，不兼容时保留原文件并写 `.incompatible` 副本；
+> 迁移抛异常时保留原文件并回退默认值。旧文件（如 `memos.json`）传 `migrator = null`，不做迁移。
 
 ### 3.5 课表导入（`com.lightdesk.feature.timetable.data`）
 
@@ -194,7 +210,8 @@ sealed interface IcsParseResult {
 ### 3.6 功能模块入口（`:app` 调用签名）
 
 ```kotlin
-HomeRoute(courseRepository, notesRepository, statsTracker, timeProvider, onOpenNotes, onOpenTimetable, modifier)
+HomeRoute(courseRepository, notesRepository, settingsRepository, statsTracker, timeProvider,
+          onOpenNotes, onOpenTimetable, modifier)
 NotesRoute(notesRepository, statsTracker, timeProvider, modifier)
 TimetableRoute(repository: CourseRepository, statsTracker, timeProvider, modifier)
 WeatherRoute(cacheRepository: WeatherRepository, settingsRepository, statsTracker, modifier)

@@ -43,6 +43,7 @@ class NotesViewModelTest {
         timeProvider = FakeTimeProvider()
         statsTracker = StatsTracker(
             repository = statsRepository,
+            settingsRepository = FakeSettingsRepository(),
             scope = CoroutineScope(UnconfinedTestDispatcher()),
             timeProvider = timeProvider,
             logger = NoOpLogger,

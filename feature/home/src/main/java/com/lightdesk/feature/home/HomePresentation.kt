@@ -42,10 +42,14 @@ data class TodayTodo(
  */
 object HomePresentation {
 
-    /** 距离截止不足该时长视为“紧急”，倒计时用警示色展示。 */
+    /** 默认“临近截止”窗口（毫秒）；实际值由设置项 `countdownWarningMinutes` 覆盖。 */
     const val WARNING_MILLIS: Long = 60L * 60L * 1000L
 
+    /** 默认提醒窗口（分钟），与 [WARNING_MILLIS] 等值；设置项缺省时使用。 */
+    const val DEFAULT_WARNING_MINUTES: Int = 60
+
     private const val MINUTES_PER_HOUR = 60
+    private const val MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR
 
     /** 按小时返回问候语。 */
     fun greeting(hourOfDay: Int): String = when (hourOfDay) {
@@ -100,10 +104,11 @@ object HomePresentation {
         items: List<NoteItem>,
         now: Long,
         zone: ZoneId = ZoneId.systemDefault(),
-    ): List<TodayTodo> = todayTodos(items, now, zone).map { item -> toTodoUi(item, now) }
+        warningMillis: Long = WARNING_MILLIS,
+    ): List<TodayTodo> = todayTodos(items, now, zone).map { item -> toTodoUi(item, now, warningMillis) }
 
-    /** 单条待办的倒计时展示信息。 */
-    fun toTodoUi(item: NoteItem, now: Long): TodayTodo {
+    /** 单条待办的倒计时展示信息；[warningMillis] 为“临近截止”窗口（<= 0 表示关闭紧急标记）。 */
+    fun toTodoUi(item: NoteItem, now: Long, warningMillis: Long = WARNING_MILLIS): TodayTodo {
         val deadline = item.deadline
         if (deadline == null) {
             return TodayTodo(item = item, countdownText = "", overdue = false, urgent = false)
@@ -113,7 +118,7 @@ object HomePresentation {
             item = item,
             countdownText = TimeFormat.countdownText(remaining),
             overdue = remaining < 0,
-            urgent = remaining >= 0 && remaining < WARNING_MILLIS,
+            urgent = warningMillis > 0 && remaining >= 0 && remaining < warningMillis,
         )
     }
 
@@ -163,11 +168,28 @@ object HomePresentation {
         CourseStatus.FINISHED -> "已结束"
     }
 
-    /** 待办紧急标签：已逾期优先，其次 1 小时内截止；普通待办不显示标签。 */
-    fun todoTagLabel(overdue: Boolean, urgent: Boolean): String? = when {
+    /**
+     * 待办紧急标签：已逾期优先，其次展示当前提醒窗口内的剩余时间。
+     * [warningMinutes] 来自设置项，默认 60 分钟以保持旧行为。
+     */
+    fun todoTagLabel(
+        overdue: Boolean,
+        urgent: Boolean,
+        warningMinutes: Int = DEFAULT_WARNING_MINUTES,
+    ): String? = when {
         overdue -> "已逾期"
-        urgent -> "1 小时内"
+        urgent -> warningWindowLabel(warningMinutes)
         else -> null
+    }
+
+    /** 提醒窗口文案：30 分钟 / 1 小时 / 1 天等；[minutes] <= 0 表示关闭提醒（返回 null）。 */
+    fun warningWindowLabel(minutes: Int): String? {
+        if (minutes <= 0) return null
+        return when {
+            minutes % MINUTES_PER_DAY == 0 -> "${minutes / MINUTES_PER_DAY} 天内"
+            minutes % MINUTES_PER_HOUR == 0 -> "${minutes / MINUTES_PER_HOUR} 小时内"
+            else -> "$minutes 分钟内"
+        }
     }
 
     /** 色块内容不透明度：已结束的课程整体淡出，进行中/即将开始的保持清晰。 */

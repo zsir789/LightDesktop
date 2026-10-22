@@ -287,7 +287,12 @@ private fun TodayTodosSection(state: HomeUiState, onOpenNotes: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 state.todos.forEachIndexed { index, todo ->
                     StaggeredFadeIn(index = index) {
-                        TodoBlock(todo = todo, now = state.now, onClick = onOpenNotes)
+                        TodoBlock(
+                            todo = todo,
+                            now = state.now,
+                            warningMinutes = state.warningMinutes,
+                            onClick = onOpenNotes,
+                        )
                     }
                 }
             }
@@ -299,7 +304,7 @@ private fun TodayTodosSection(state: HomeUiState, onOpenNotes: () -> Unit) {
 }
 
 @Composable
-private fun TodoBlock(todo: TodayTodo, now: Long, onClick: () -> Unit) {
+private fun TodoBlock(todo: TodayTodo, now: Long, warningMinutes: Int, onClick: () -> Unit) {
     val item = todo.item
     val seed = HomePresentation.todoSeed(item.id)
     val containerColor = CourseColors.container(seed)
@@ -312,7 +317,11 @@ private fun TodoBlock(todo: TodayTodo, now: Long, onClick: () -> Unit) {
         else -> MaterialTheme.colorScheme.primary
     }
     val metaColor = contentColor.copy(alpha = contentColor.alpha * 0.7f)
-    val tagLabel = HomePresentation.todoTagLabel(overdue = todo.overdue, urgent = todo.urgent)
+    val tagLabel = HomePresentation.todoTagLabel(
+        overdue = todo.overdue,
+        urgent = todo.urgent,
+        warningMinutes = warningMinutes,
+    )
     val tagColor = if (todo.overdue) statusColors.danger else statusColors.warning
 
     ColorBlockCard(

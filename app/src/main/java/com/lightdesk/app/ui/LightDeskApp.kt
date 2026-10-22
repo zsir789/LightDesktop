@@ -130,6 +130,7 @@ fun LightDeskApp(container: AppContainer) {
                 HomeRoute(
                     courseRepository = container.courseRepository,
                     notesRepository = container.notesRepository,
+                    settingsRepository = container.settingsRepository,
                     statsTracker = container.statsTracker,
                     timeProvider = container.timeProvider,
                     onOpenNotes = { navigateTo(TopLevelDestination.NOTES) },

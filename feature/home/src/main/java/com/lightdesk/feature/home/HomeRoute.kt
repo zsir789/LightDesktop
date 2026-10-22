@@ -10,6 +10,7 @@ import com.lightdesk.core.common.simpleViewModelFactory
 import com.lightdesk.core.data.StatsTracker
 import com.lightdesk.core.data.repository.CourseRepository
 import com.lightdesk.core.data.repository.NotesRepository
+import com.lightdesk.core.data.repository.SettingsRepository
 
 /**
  * 首页入口。
@@ -23,6 +24,7 @@ import com.lightdesk.core.data.repository.NotesRepository
 fun HomeRoute(
     courseRepository: CourseRepository,
     notesRepository: NotesRepository,
+    settingsRepository: SettingsRepository,
     statsTracker: StatsTracker,
     timeProvider: TimeProvider,
     onOpenNotes: () -> Unit,
@@ -34,6 +36,7 @@ fun HomeRoute(
             HomeViewModel(
                 courseRepository = courseRepository,
                 notesRepository = notesRepository,
+                settingsRepository = settingsRepository,
                 timeProvider = timeProvider,
             )
         },

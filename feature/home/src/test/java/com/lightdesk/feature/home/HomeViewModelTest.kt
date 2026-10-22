@@ -5,6 +5,8 @@ import com.lightdesk.core.common.AppResult
 import com.lightdesk.core.common.TimeProvider
 import com.lightdesk.core.data.repository.CourseRepository
 import com.lightdesk.core.data.repository.NotesRepository
+import com.lightdesk.core.data.repository.SettingsRepository
+import com.lightdesk.core.model.AppSettings
 import com.lightdesk.core.model.Course
 import com.lightdesk.core.model.CourseTable
 import com.lightdesk.core.model.NoteItem
@@ -93,6 +95,7 @@ class HomeViewModelTest {
         val viewModel = HomeViewModel(
             courseRepository = FakeCourseRepository(table),
             notesRepository = FakeNotesRepository(notes),
+            settingsRepository = FakeSettingsRepository(),
             timeProvider = FakeTimeProvider(now),
             zone = zone,
         )
@@ -126,6 +129,7 @@ class HomeViewModelTest {
         val viewModel = HomeViewModel(
             courseRepository = courses,
             notesRepository = notes,
+            settingsRepository = FakeSettingsRepository(),
             timeProvider = FakeTimeProvider(now),
             zone = zone,
         )
@@ -154,6 +158,7 @@ class HomeViewModelTest {
         val viewModel = HomeViewModel(
             courseRepository = FakeCourseRepository(null),
             notesRepository = notes,
+            settingsRepository = FakeSettingsRepository(),
             timeProvider = FakeTimeProvider(now),
             zone = zone,
         )
@@ -179,6 +184,7 @@ class HomeViewModelTest {
         val viewModel = HomeViewModel(
             courseRepository = FakeCourseRepository(null),
             notesRepository = notes,
+            settingsRepository = FakeSettingsRepository(),
             timeProvider = clock,
             zone = zone,
         )
@@ -207,6 +213,7 @@ class HomeViewModelTest {
         val viewModel = HomeViewModel(
             courseRepository = FakeCourseRepository(null),
             notesRepository = FakeNotesRepository(notes),
+            settingsRepository = FakeSettingsRepository(),
             timeProvider = clock,
             zone = zone,
         )
@@ -225,8 +232,53 @@ class HomeViewModelTest {
         viewModel.viewModelScope.cancel()
     }
 
+    @Test
+    fun `warning window comes from settings and reacts to changes`() = runTest(dispatcher) {
+        val settings = FakeSettingsRepository(AppSettings(countdownWarningMinutes = 30))
+        val notes = FakeNotesRepository(listOf(todo("soon", now + 2L * 60L * 60_000L)))
+        val viewModel = HomeViewModel(
+            courseRepository = FakeCourseRepository(null),
+            notesRepository = notes,
+            settingsRepository = settings,
+            timeProvider = FakeTimeProvider(now),
+            zone = zone,
+        )
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        runCurrent()
+
+        assertEquals(30, viewModel.uiState.value.warningMinutes)
+        val before = viewModel.uiState.value.todos.single()
+        assertFalse("2 小时后截止，不应进入 30 分钟提醒窗口", before.urgent)
+        assertNull(HomePresentation.todoTagLabel(before.overdue, before.urgent, 30))
+
+        settings.state.value = AppSettings(countdownWarningMinutes = 180)
+        runCurrent()
+
+        assertEquals(180, viewModel.uiState.value.warningMinutes)
+        val after = viewModel.uiState.value.todos.single()
+        assertTrue(after.urgent)
+        assertEquals("3 小时内", HomePresentation.todoTagLabel(after.overdue, after.urgent, 180))
+
+        viewModel.viewModelScope.cancel()
+    }
+
     private class FakeTimeProvider(var current: Long) : TimeProvider {
         override fun now(): Long = current
+    }
+
+    private class FakeSettingsRepository(
+        initial: AppSettings = AppSettings(),
+    ) : SettingsRepository {
+        val state = MutableStateFlow(initial)
+
+        override fun observeSettings(): Flow<AppSettings> = state
+
+        override suspend fun current(): AppSettings = state.value
+
+        override suspend fun update(transform: (AppSettings) -> AppSettings): AppResult<Unit> {
+            state.value = transform(state.value)
+            return AppResult.Success(Unit)
+        }
     }
 
     private class FakeCourseRepository(initial: CourseTable?) : CourseRepository {

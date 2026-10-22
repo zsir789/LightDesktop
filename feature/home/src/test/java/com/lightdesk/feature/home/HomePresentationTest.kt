@@ -268,4 +268,58 @@ class HomePresentationTest {
         assertEquals("00:00:30", TimeFormat.countdownText(30_000L))
         assertEquals("1天 02:00:00", TimeFormat.countdownText(26L * 60L * 60L * 1000L))
     }
+
+    // ---- 可配置提醒窗口 ----
+
+    @Test
+    fun `toTodoUi respects custom warning window`() {
+        val item = todo("a", now + 90L * 60_000L)
+
+        assertFalse(HomePresentation.toTodoUi(item, now, warningMillis = 60L * 60_000L).urgent)
+        assertTrue(HomePresentation.toTodoUi(item, now, warningMillis = 120L * 60_000L).urgent)
+        assertFalse(
+            "关闭提醒窗口（<=0）后不再标记紧急",
+            HomePresentation.toTodoUi(item, now, warningMillis = 0L).urgent,
+        )
+        assertTrue(
+            HomePresentation.toTodoUi(todo("late", now - 1L), now, warningMillis = 0L).overdue,
+        )
+    }
+
+    @Test
+    fun `todo tag label follows warning minutes`() {
+        assertEquals("已逾期", HomePresentation.todoTagLabel(overdue = true, urgent = false, warningMinutes = 30))
+        assertEquals("30 分钟内", HomePresentation.todoTagLabel(false, true, 30))
+        assertEquals("2 小时内", HomePresentation.todoTagLabel(false, true, 120))
+        assertEquals("1 天内", HomePresentation.todoTagLabel(false, true, 24 * 60))
+        assertEquals("3 天内", HomePresentation.todoTagLabel(false, true, 3 * 24 * 60))
+        assertNull(HomePresentation.todoTagLabel(false, true, 0))
+        assertNull("普通待办不显示标签", HomePresentation.todoTagLabel(false, false, 60))
+    }
+
+    @Test
+    fun `warning window label handles boundaries`() {
+        assertNull(HomePresentation.warningWindowLabel(0))
+        assertNull(HomePresentation.warningWindowLabel(-5))
+        assertEquals("1 分钟内", HomePresentation.warningWindowLabel(1))
+        assertEquals("59 分钟内", HomePresentation.warningWindowLabel(59))
+        assertEquals("1 小时内", HomePresentation.warningWindowLabel(60))
+        assertEquals("1 天内", HomePresentation.warningWindowLabel(24 * 60))
+    }
+
+    @Test
+    fun `buildHomeUiState applies warning minutes`() {
+        val items = listOf(todo("soon", now + 30L * 60_000L))
+
+        val state = buildHomeUiState(
+            table = null,
+            items = items,
+            now = now,
+            zone = zone,
+            warningMinutes = 15,
+        )
+
+        assertEquals(15, state.warningMinutes)
+        assertFalse("剩余 30 分钟，15 分钟窗口内不应紧急", state.todos.single().urgent)
+    }
 }

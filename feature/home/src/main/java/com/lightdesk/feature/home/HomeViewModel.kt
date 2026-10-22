@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.lightdesk.core.common.TimeProvider
 import com.lightdesk.core.data.repository.CourseRepository
 import com.lightdesk.core.data.repository.NotesRepository
+import com.lightdesk.core.data.repository.SettingsRepository
 import com.lightdesk.core.model.CourseTable
 import com.lightdesk.core.model.NoteItem
 import com.lightdesk.core.model.TimetableCalendar
@@ -38,6 +39,8 @@ data class HomeUiState(
     val courses: List<TodayCourse> = emptyList(),
     val todos: List<TodayTodo> = emptyList(),
     val pendingTodoCount: Int = 0,
+    /** 临近截止提醒窗口（分钟），来自设置项 `countdownWarningMinutes`。 */
+    val warningMinutes: Int = HomePresentation.DEFAULT_WARNING_MINUTES,
     val loading: Boolean = true,
     val error: String? = null,
 ) {
@@ -60,6 +63,7 @@ data class HomeUiState(
 class HomeViewModel(
     private val courseRepository: CourseRepository,
     private val notesRepository: NotesRepository,
+    private val settingsRepository: SettingsRepository,
     private val timeProvider: TimeProvider,
     private val zone: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
@@ -70,13 +74,17 @@ class HomeViewModel(
     val uiState: StateFlow<HomeUiState> = refreshTrigger
         .flatMapLatest { loadSources() }
         .flatMapLatest { sources ->
-            nowFlow(sources).map { now ->
+            combine(
+                warningMinutesFlow(),
+                nowFlow(sources),
+            ) { warningMinutes, now ->
                 buildHomeUiState(
                     table = sources.table,
                     items = sources.items,
                     now = now,
                     zone = zone,
                     error = sources.error,
+                    warningMinutes = warningMinutes,
                 )
             }
         }
@@ -130,6 +138,11 @@ class HomeViewModel(
         }
     }
 
+    /** 提醒窗口设置流；读取失败时退回默认值，避免整页进入错误态。 */
+    private fun warningMinutesFlow(): Flow<Int> = settingsRepository.observeSettings()
+        .map { settings -> settings.countdownWarningMinutes }
+        .catch { emit(HomePresentation.DEFAULT_WARNING_MINUTES) }
+
     /** 有待办时每秒推送一次当前时间，否则只取一次快照。 */
     private fun nowFlow(sources: HomeSources): Flow<Long> {
         val needsTicking = sources.items.any { it.isTodo && !it.done }
@@ -165,6 +178,7 @@ internal fun buildHomeUiState(
     now: Long,
     zone: ZoneId = ZoneId.systemDefault(),
     error: String? = null,
+    warningMinutes: Int = HomePresentation.DEFAULT_WARNING_MINUTES,
 ): HomeUiState {
     val today = HomePresentation.localDate(now, zone)
     return HomeUiState(
@@ -174,8 +188,14 @@ internal fun buildHomeUiState(
         weekNumber = TimetableCalendar.currentWeek(table, now),
         hasTimetable = HomePresentation.hasTimetable(table),
         courses = HomePresentation.todayCourses(table, now, zone),
-        todos = HomePresentation.todayTodosUi(items, now, zone),
+        todos = HomePresentation.todayTodosUi(
+            items = items,
+            now = now,
+            zone = zone,
+            warningMillis = warningMinutes * 60_000L,
+        ),
         pendingTodoCount = HomePresentation.pendingTodoCount(items),
+        warningMinutes = warningMinutes,
         loading = false,
         error = error,
     )

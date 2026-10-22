@@ -12,6 +12,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -22,7 +25,8 @@ import java.nio.file.StandardCopyOption
  * 设计要点：
  * 1. 读：文件损坏/格式不兼容时自动备份损坏文件并回退默认值，绝不崩溃；
  * 2. 写：先写临时文件再原子替换，避免进程被杀导致半截文件；
- * 3. 并发：内部 Mutex 串行化读写，配合内存缓存减少 IO。
+ * 3. 并发：内部 Mutex 串行化读写，配合内存缓存减少 IO；
+ * 4. 迁移：可选 [migrator] 按文件根部的 `schemaVersion` 做结构迁移，迁移失败保留原文件。
  *
  * 后续若迁移到 Room/DataStore，只需替换仓储实现，接口不变。
  */
@@ -32,6 +36,7 @@ class JsonFileStore<T>(
     private val defaultValue: () -> T,
     private val logger: Logger = AppLogger,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val migrator: JsonSchemaMigrator? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -100,17 +105,53 @@ class JsonFileStore<T>(
     }
 
     private fun readFromDisk(): T {
-        return try {
-            if (!file.exists() || file.length() == 0L) {
-                defaultValue()
-            } else {
-                json.decodeFromString(serializer, file.readText(Charsets.UTF_8))
+        if (!file.exists() || file.length() == 0L) return defaultValue()
+
+        val raw = try {
+            file.readText(Charsets.UTF_8)
+        } catch (throwable: Throwable) {
+            logger.e(TAG, "读取本地数据失败，已回退默认值: ${file.name}", throwable)
+            return defaultValue()
+        }
+
+        // 取不到版本号说明不是预期的 JSON 对象，交给反序列化去判定是否损坏。
+        val version = runCatching { schemaVersionOf(raw) }.getOrNull()
+        val currentVersion = migrator?.currentVersion
+        val fromHigherVersion = version != null && currentVersion != null && version > currentVersion
+        if (fromHigherVersion) {
+            logger.w(TAG, "本地数据版本($version)高于当前支持($currentVersion)，按当前结构尽力读取: ${file.name}")
+        }
+
+        val source = if (migrator != null && version != null && currentVersion != null && version < currentVersion) {
+            try {
+                migrator.migrate(raw, version)
+            } catch (throwable: Throwable) {
+                logger.e(TAG, "本地数据迁移失败(schemaVersion=$version)，已保留原文件: ${file.name}", throwable)
+                return defaultValue()
             }
+        } else {
+            raw
+        }
+
+        return try {
+            json.decodeFromString(serializer, source)
         } catch (throwable: Throwable) {
             logger.e(TAG, "读取本地数据失败，已备份并回退默认值: ${file.name}", throwable)
-            backupCorruptedFile()
+            if (fromHigherVersion) {
+                copyFileBackup(INCOMPATIBLE_SUFFIX)
+            } else {
+                backupCorruptedFile()
+            }
             defaultValue()
         }
+    }
+
+    /** 只解析根部的 `schemaVersion`，避免为了拿版本号反序列化整个模型。 */
+    private fun schemaVersionOf(raw: String): Int? {
+        val element = json.parseToJsonElement(raw)
+        return (element as? JsonObject)
+            ?.get("schemaVersion")
+            ?.let { value -> (value as? JsonPrimitive)?.intOrNull }
     }
 
     private fun backupCorruptedFile() {
@@ -120,6 +161,15 @@ class JsonFileStore<T>(
                 moveReplacing(file, backup)
             }
         }.onFailure { logger.w(TAG, "备份损坏文件失败: ${file.name}", it) }
+    }
+
+    /** 保留原文件的备份（用于“数据来自更高版本”等不能覆盖原文件的场景）。 */
+    private fun copyFileBackup(suffix: String) {
+        runCatching {
+            if (!file.exists()) return@runCatching
+            val backup = File(file.parentFile, "${file.name}.$suffix")
+            Files.copy(file.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }.onFailure { logger.w(TAG, "备份本地数据失败: ${file.name}", it) }
     }
 
     private fun moveReplacing(from: File, to: File) {
@@ -141,5 +191,8 @@ class JsonFileStore<T>(
 
     private companion object {
         const val TAG = "JsonFileStore"
+
+        /** 数据来自更高版本时的原文件备份后缀。 */
+        const val INCOMPATIBLE_SUFFIX = "incompatible"
     }
 }

@@ -581,7 +581,7 @@ private fun AboutCard(appVersion: String) {
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = "所有设置与统计仅保存在本机应用私有目录（JSON 文件），不会上传服务器；" +
-                "卸载应用或清除应用数据会一并删除，请按需自行备份。",
+                "卸载应用或清除应用数据会一并删除。当前版本暂不支持导出，计划后续版本提供备份与恢复。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
